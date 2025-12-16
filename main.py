@@ -1,11 +1,22 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 import sqlite3, hashlib, secrets, datetime
-from server_settings import MAX_SIZE, token_valid
+from server_settings import MAX_SIZE,UPLOAD_FOLDER, token_valid
+from product_routes import product_bp
+from order_routes import order_bp
+#import order_routes
 
+# create app
 app = Flask(__name__)
+
+# register blueprints
+app.register_blueprint(product_bp)
+app.register_blueprint(order_bp)
+
+# config
 app.config['MAX_CONTENT_LENGTH'] = MAX_SIZE
-import product_routes
-import order_routes
+
+
+
 @app.route('/login', methods=['POST'])
 def login():
     try:
@@ -135,13 +146,12 @@ def info():
 
         conn = sqlite3.connect("emap.db")
         valid  = token_valid(conn, token)
-        text = " "
+        text = " okay this is a test text will see how it looks on the app hehe \n test test test \n more testing \n ."
 
         return jsonify({'text': text, 'success': True}) if valid else jsonify({"error": "token not valid"})
 
     except Exception as e:
         return jsonify({'error': str(e)})
 
-
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5013, debug=False)
+    app.run(host="0.0.0.0", port=5013, debug=True)

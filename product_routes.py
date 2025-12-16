@@ -1,9 +1,12 @@
-from main import app
 from PIL import Image
 import os
-from flask import request, jsonify, send_from_directory
+from flask import request, jsonify, send_from_directory, Blueprint
 import sqlite3, json, uuid
-from server_settings import UPLOAD_FOLDER, THUMBS_FOLDER, ALLOWED_EXT, is_admin
+from server_settings import UPLOAD_FOLDER, THUMBS_FOLDER, ALLOWED_EXT, is_admin, token_valid
+
+# blue print
+product_bp = Blueprint('product',__name__)
+
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(THUMBS_FOLDER, exist_ok=True)
@@ -12,16 +15,16 @@ def is_allowed(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXT
 
 def save_image(file):
-    """Save an uploaded image and return (success, original, thumbnail, error_msg)."""
+    """save an uploaded image and return (success, original, thumbnail, error_msg)"""
 
     if not file:
-        return False, None, None, "No image file"
+        return False, None, None, "no image file"
 
     if file.filename == "":
-        return False, None, None, "No file selected"
+        return False, None, None, "no file selected"
 
     if not is_allowed(file.filename):
-        return False, None, None, "Only JPG, JPEG, PNG allowed"
+        return False, None, None, "only JPG, JPEG, PNG allowed"
 
     try:
         # generate unique name
@@ -45,7 +48,7 @@ def save_image(file):
     except Exception as e:
         return False, None, None, str(e)
 
-@app.route('/add_product', methods=['POST'])
+@product_bp.route('/add_product', methods=['POST'])
 def add_product():
     try:
         token = request.form.get('token')
@@ -107,7 +110,7 @@ def add_product():
 
     except Exception as e:
         return jsonify(error=str(e))
-@app.route('/delete_product', methods=['POST'])
+@product_bp.route('/delete_product', methods=['POST'])
 def delete_product():
     try:
         token = request.form.get('token')
@@ -116,6 +119,7 @@ def delete_product():
         # db connection
         conn = sqlite3.connect("emap.db")
         cursor = conn.cursor()
+
         # check admin
         if not is_admin(conn, token):
             return jsonify(error="Not authorized")
@@ -141,6 +145,7 @@ def get_images(cursor, product_id):
     cursor.execute("SELECT file_name FROM images WHERE product_id = ?", (product_id,))
     rows = cursor.fetchall()
     return [row[0] for row in rows] # a list of image names
+
 def get_products_dict(cursor, rows):
     products = []
     for row in rows:
@@ -159,11 +164,16 @@ def get_products_dict(cursor, rows):
 
     return products
 
-@app.route('/products', methods=['POST'])
+@product_bp.route('/products', methods=['POST'])
 def get_all_products():
     try:
+        print("okay")
         conn = sqlite3.connect("emap.db")
         cursor = conn.cursor()
+    
+        #if not token_valid(conn, request.get_json()["token"]):
+        #     raise Exception("token not valid")
+        
 
         cursor.execute("SELECT * FROM products ORDER BY product_id DESC")
         rows = cursor.fetchall()
@@ -171,16 +181,24 @@ def get_all_products():
         products = get_products_dict(cursor, rows)
 
         conn.close()
+        print("will go fine")
+        print(products)
         return jsonify(success=True, products=products)
 
     except Exception as e:
-        return jsonify(error=str(e))
+        return jsonify(error="oops: "+str(e))
 
 
-@app.route('/uploads/<filename>')
+@product_bp.route('/uploads/<filename>', methods=["GET"])
 def serve_uploaded_img(filename):
     return send_from_directory(UPLOAD_FOLDER, filename)
 
-@app.route('/uploads/thumbs/<filename>')
+@product_bp.route('/uploads/thumbs/<filename>')
 def serve_uploaded_thumbnail(filename):
     return send_from_directory(UPLOAD_FOLDER, filename)
+
+
+# print("Registered routes:")
+# for rule in app.url_map.iter_rules():
+#     print(rule)
+
